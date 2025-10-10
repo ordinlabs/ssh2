@@ -32,9 +32,6 @@ const serverCfg = { hostKeys: [ fixture('ssh_host_rsa_key') ] };
   }
 
   const agent = net.createServer((agentSocket) => {
-    log.info('Agent proxy socket received connection', {
-      sessionId,
-    });
     assert(!agentSocket.readable, 'Agent socket not readable');
   }).listen(agentSockPath, () => {
     const cleanup = () => {
