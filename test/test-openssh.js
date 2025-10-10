@@ -3,6 +3,8 @@
 const assert = require('assert');
 const { inspect } = require('util');
 const { spawn } = require('child_process');
+const net = require('net');
+const fs = require('fs');
 
 const {
   fixture,
@@ -13,27 +15,44 @@ const {
 
 const debug = false;
 
-const test_forward = (process.platform !== 'win32');
-
-if (!test_forward)
-  console.log('Skipping agent forwarding test on Windows');
-
-
 const clientCfg = { username: 'foo', password: 'bar' };
 const serverCfg = { hostKeys: [ fixture('ssh_host_rsa_key') ] };
 
 {
-  const agent_sock = '/tmp/nodejs-ssh2-test-' + process.pid;
-  let agent;
-  if (test_forward)
-      agent = spawn('ssh-agent', ['-d', '-a', agent_sock]);
+
+  const agentSockPath =
+      process.platform === 'win32'
+          ? `\\\\.\\pipe\\nodejs-ssh2-test-${process.pid}`
+          : `${os.tmpdir()}${
+              path.sep
+          }nodejs-ssh2-test-${process.pid}.sock`;
+
+  if (fs.existsSync(agentSockPath)) {
+    fs.unlinkSync(agentSockPath);
+  }
+
+  const agent = net.createServer((agentSocket) => {
+    log.info('Agent proxy socket received connection', {
+      sessionId,
+    });
+    assert(!agentSocket.readable, 'Agent socket not readable');
+  }).listen(agentSockPath, () => {
+    const cleanup = () => {
+      server.close(() => {
+        if (fs.existsSync(agentSockPath)) {
+          fs.unlinkSync(agentSockPath);
+        }
+      });
+    };
+    process.on('exit', cleanup);
+  });
 
   const { client, server } = setup_(
     'Exec with OpenSSH agent forwarding',
     {
       client: {
         ...clientCfg,
-        agent: agent_sock,
+        agent: agentSockPath,
       },
       server: serverCfg,
 
@@ -58,19 +77,14 @@ const serverCfg = { hostKeys: [ fixture('ssh_host_rsa_key') ] };
           stream.exit(100);
           stream.end();
 
-          if (test_forward) {
-            conn.openssh_authAgent(function(err, stream) {
-              assert(!err, `Unexpected openssh_authAgent error: ${err}`);
-              assert(stream.type === 'auth-agent@openssh.com',
-                  `Unexpected openssh_authAgent channel type : ${stream.type}`);
+          conn.openssh_authAgent(function(err, stream) {
+            assert(!err, `Unexpected openssh_authAgent error: ${err}`);
+            assert(stream.type === 'auth-agent@openssh.com',
+                `Unexpected openssh_authAgent channel type : ${stream.type}`);
 
-              conn.end();
-              agent.kill();
-            });
-
-          } else {
-              conn.end();
-          }
+            conn.end();
+            agent.kill();
+          });
 
         }));
 
