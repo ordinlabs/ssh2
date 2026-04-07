@@ -32,11 +32,11 @@ For example: `1.17.0-ordin.1`, `1.17.0-ordin.2`, etc.
 
 3. Publish to npm:
    ```bash
-   npm publish --access public --tag ordin
+   npm publish --access public --tag ordin-master
    ```
-   The `--tag ordin` is required for prerelease versions. This prevents the prerelease from becoming the `latest` tag on npm. Users install with:
+   The `--tag ordin-master` is required for prerelease versions. This prevents the prerelease from becoming the `latest` tag on npm. Users install with:
    ```bash
-   npm install @ordinlabs/ssh2@ordin
+   npm install @ordinlabs/ssh2@ordin-master
    ```
 
 ## Merging Upstream Changes
