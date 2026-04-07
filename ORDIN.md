@@ -28,6 +28,7 @@ For example: `1.17.0-ordin.1`, `1.17.0-ordin.2`, etc.
    git add package.json
    git commit -m "chore: release 1.17.0-ordin.2"
    git tag v1.17.0-ordin.2
+   git push origin v1.17.0-ordin.2
    ```
 
 3. Publish to npm:
