@@ -1,10 +1,9 @@
 'use strict';
 
 const assert = require('assert');
-const { inspect } = require('util');
-const { spawn } = require('child_process');
-const net = require('net');
 const fs = require('fs');
+const net = require('net');
+const { inspect } = require('util');
 
 const {
   fixture,
@@ -19,37 +18,12 @@ const clientCfg = { username: 'foo', password: 'bar' };
 const serverCfg = { hostKeys: [ fixture('ssh_host_rsa_key') ] };
 
 {
-
-  const agentSockPath =
-      process.platform === 'win32'
-          ? `\\\\.\\pipe\\nodejs-ssh2-test-${process.pid}`
-          : `${os.tmpdir()}${
-              path.sep
-          }nodejs-ssh2-test-${process.pid}.sock`;
-
-  if (fs.existsSync(agentSockPath)) {
-    fs.unlinkSync(agentSockPath);
-  }
-
-  const agent = net.createServer((agentSocket) => {
-    assert(!agentSocket.readable, 'Agent socket not readable');
-  }).listen(agentSockPath, () => {
-    const cleanup = () => {
-      server.close(() => {
-        if (fs.existsSync(agentSockPath)) {
-          fs.unlinkSync(agentSockPath);
-        }
-      });
-    };
-    process.on('exit', cleanup);
-  });
-
   const { client, server } = setup_(
     'Exec with OpenSSH agent forwarding',
     {
       client: {
         ...clientCfg,
-        agent: agentSockPath,
+        agent: '/path/to/agent',
       },
       server: serverCfg,
 
@@ -73,18 +47,8 @@ const serverCfg = { hostKeys: [ fixture('ssh_host_rsa_key') ] };
           const stream = accept();
           stream.exit(100);
           stream.end();
-
-          conn.openssh_authAgent(function(err, stream) {
-            assert(!err, `Unexpected openssh_authAgent error: ${err}`);
-            assert(stream.type === 'auth-agent@openssh.com',
-                `Unexpected openssh_authAgent channel type : ${stream.type}`);
-
-            conn.end();
-            agent.kill();
-          });
-
+          conn.end();
         }));
-
       }));
     }));
   }));
@@ -295,5 +259,78 @@ const serverCfg = { hostKeys: [ fixture('ssh_host_rsa_key') ] };
       `Wrong tcp details: ${inspect(details)}`
     );
     accept();
+  }));
+}
+
+{
+  const { join } = require('path');
+  const { tmpdir } = require('os');
+
+  const agentSockPath = process.platform === 'win32'
+    ? `\\\\.\\pipe\\ssh2-test-agent-${process.pid}`
+    : join(tmpdir(), `ssh2-test-agent-${process.pid}.sock`);
+
+  const isWin = process.platform === 'win32';
+
+  if (!isWin && fs.existsSync(agentSockPath))
+    fs.unlinkSync(agentSockPath);
+
+  // Fake agent: echoes back whatever it receives
+  const agentServer = net.createServer(mustCall((sock) => {
+    sock.on('data', mustCallAtLeast((data) => {
+      sock.write(data);
+    }));
+  }));
+
+  agentServer.listen(agentSockPath);
+
+  const { client, server } = setup_(
+    'Server-initiated openssh_authAgent channel',
+    {
+      client: {
+        ...clientCfg,
+        agent: agentSockPath,
+      },
+      server: serverCfg,
+      debug,
+    },
+  );
+
+  server.on('connection', mustCall((conn) => {
+    conn.on('authentication', mustCall((ctx) => {
+      ctx.accept();
+    })).on('ready', mustCall(() => {
+      conn.on('session', mustCall((accept, reject) => {
+        accept().on('auth-agent', mustCall((accept, reject) => {
+          accept && accept();
+        })).on('exec', mustCall((accept, reject, info) => {
+          const stream = accept();
+          stream.exit(0);
+          stream.end();
+
+          conn.openssh_authAgent(mustCall((err, agentStream) => {
+            assert(!err, `Unexpected openssh_authAgent error: ${err}`);
+
+            const testData = 'agent-ping';
+            agentStream.on('data', mustCallAtLeast((data) => {
+              assert(data.toString() === testData,
+                `Expected '${testData}', got: '${data}'`);
+              conn.end();
+              agentServer.close();
+              if (!isWin && fs.existsSync(agentSockPath))
+                fs.unlinkSync(agentSockPath);
+            }));
+            agentStream.write(testData);
+          }));
+        }));
+      }));
+    }));
+  }));
+
+  client.on('ready', mustCall(() => {
+    client.exec('foo', { agentForward: true }, mustCall((err, stream) => {
+      assert(!err, `Unexpected exec error: ${err}`);
+      stream.resume();
+    }));
   }));
 }
