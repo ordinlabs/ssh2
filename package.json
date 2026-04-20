@@ -1,9 +1,10 @@
 {
-  "name": "ssh2",
-  "version": "1.17.0",
+  "name": "@ordinlabs/ssh2",
+  "version": "1.17.0-ordin.5",
   "author": "Brian White <mscdex@mscdex.net>",
   "description": "SSH2 client and server modules written in pure JavaScript for node.js",
   "main": "./lib/index.js",
+  "types": "./types/index.d.ts",
   "engines": {
     "node": ">=10.16.0"
   },
@@ -44,6 +45,19 @@
   ],
   "repository": {
     "type": "git",
-    "url": "http://github.com/mscdex/ssh2.git"
+    "url": "git+ssh://git@github.com/mscdex/ssh2.git"
+  },
+  "directories": {
+    "example": "examples",
+    "lib": "lib",
+    "test": "test"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mscdex/ssh2/issues"
+  },
+  "homepage": "https://github.com/mscdex/ssh2#readme",
+  "peerDependencies": {
+    "@types/ssh2": "^1.15.5"
   }
 }
