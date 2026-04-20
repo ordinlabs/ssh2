@@ -20,15 +20,15 @@ For example: `1.17.0-ordin.1`, `1.17.0-ordin.2`, etc.
 
 1. Update the version in `package.json`:
    ```bash
-   npm version 1.17.0-ordin.2 --no-git-tag-version
+   npm version 1.17.0-ordin.x --no-git-tag-version
    ```
 
 2. Commit and tag:
    ```bash
    git add package.json package-lock.json
-   git commit -m "chore: release 1.17.0-ordin.2"
-   git tag v1.17.0-ordin.2
-   git push origin v1.17.0-ordin.2
+   git commit -m "chore: release 1.17.0-ordin.x"
+   git tag v1.17.0-ordin.x
+   git push origin v1.17.0-ordin.x
    ```
 
 3. Publish to npm:
